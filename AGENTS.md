@@ -78,20 +78,26 @@ Use cases nunca sao instanciados diretamente nas rotas. `src/lib/use-cases/facto
 1. Tela inicial conecta `GET /api/sse/entrada` (SSE). Servidor executa `PrepareEntryUseCase`: busca vaga de menor code → gera token UUID → gera QR codificando `/entrada/confirmar?token=<uuid>` → envia evento `vaga_ocupada` com `{ spot, token, qrDataUrl }`.
 2. Visitante escaneia QR → abre `/entrada/confirmar?token=<uuid>`.
 3. Pagina `/entrada/confirmar` faz `GET /api/confirmar?token=<uuid>` → cria entry + marca spot ocupada → retorna QR (mesmo token) p/ visitante salvar.
-4. `GET /api/confirmar` emite SSE `vaga_ocupada` via `entrada-emitter.ts` → servidor SSE gera nova vaga → ciclo.
+4. `GET /api/confirmar` emite SSE via `entrada-emitter.ts` (no `finally`, mesmo em erro) → servidor SSE tenta gerar nova vaga.
 5. Nao existe rota REST `/api/entrada/preparar` — preparacao ocorre dentro do SSE handler.
+6. **Sem vagas:** SSE envia evento `error` mas **conexao permanece aberta**, ouvindo novas saidas.
 
 ## Fluxo saida
 1. Visitante chega saida, acessa /saida com token (do QR salvo no celular)
 2. Endpoint saida: busca entry pelo token (exit_time IS NULL) → marca exit_time=now → spot volta disponivel
-3. SSE nao necessario — tela entrada descobre vaga livre quando proximo visitante escanear
+3. `GET /api/saida` emite SSE via `entrada-emitter.ts` → SSE acorda, `PrepareEntryUseCase` acha vaga livre, envia novo QR.
+4. **Conexao SSE nunca morre por falta de vagas** — fica ouvindo ate saida liberar ou cliente fechar.
 
 ## Server-Sent Events (SSE)
 - use-next-sse p/ SSE unidirecional servidor → tela entrada
-- Rota: `GET /api/sse/entrada` — cria conexao SSE, prepara entrada, envia evento, aguarda proximo
-- `src/lib/sse/entrada-emitter.ts` — EventEmitter singleton p/ `GET /api/confirmar` notificar SSE apos escaneamento
-- Unico evento: `vaga_ocupada` — payload `{ spot, token, qrDataUrl }`
-- Evento de erro: `error` — payload `{ error }` (sem vagas)
+- Rota: `GET /api/sse/entrada` — cria conexao SSE
+- `src/lib/sse/entrada-emitter.ts` — EventEmitter singleton notificado por `GET /api/confirmar` e `GET /api/saida`
+- Conexao **persistente**: quando sem vagas, envia `error` e continua ouvindo. Ao receber evento (via saida), tenta preparar nova entrada.
+- Evento `vaga_ocupada` — payload `{ spot, token, qrDataUrl }`
+- Evento `error` — payload `{ error }` (sem vagas, conexao nao fecha)
+- Quem emite eventos no emitter:
+  - `GET /api/confirmar` — sempre (finally), sucesso ou erro
+  - `GET /api/saida` — apenas em saida bem-sucedida
 - useSSE hook no client: ao receber `vaga_ocupada`, renderiza novo QR
 - Reconexao automatica configurada
 

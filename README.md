@@ -161,6 +161,8 @@ SSE endpoint que envia QR codes em tempo real para a tela de entrada.
 
 Mantém conexão SSE aberta. A cada escaneamento de QR Code, envia a próxima vaga disponível com QR já gerado. O QR code na tela de entrada codifica `/entrada/confirmar?token=<uuid>`.
 
+**Conexão persistente:** quando não há vagas disponíveis, o evento `error` é enviado mas a conexão **permanece aberta**, aguardando uma saída liberar vaga. Ao receber notificação de saída (`GET /api/saida`), o servidor tenta preparar uma nova entrada automaticamente.
+
 **Headers:** `Content-Type: text/event-stream`, `Cache-Control: no-cache`, `Connection: keep-alive`
 
 **Eventos:**
@@ -168,7 +170,7 @@ Mantém conexão SSE aberta. A cada escaneamento de QR Code, envia a próxima va
 | Evento | Payload | Descrição |
 |--------|---------|-----------|
 | `vaga_ocupada` | `{ spot, token, qrDataUrl }` | Vaga disponível com QR code (data URI) |
-| `error` | `{ error }` | Nenhuma vaga disponível no momento |
+| `error` | `{ error }` | Nenhuma vaga disponível no momento (conexão não fecha) |
 
 **Resposta 200 (evento `vaga_ocupada`):**
 ```json
@@ -236,7 +238,7 @@ Cria o registro de entrada no banco, marca a vaga como ocupada e dispara evento 
 ---
 
 ### `GET /api/saida?token=<uuid>`
-Registra a saída do veículo. Libera a vaga e marca exit_time na entrada.
+Registra a saída do veículo. Libera a vaga, marca exit_time na entrada e notifica o SSE de entrada para gerar novo QR.
 
 **Parâmetros query:**
 
@@ -296,6 +298,24 @@ Autentica o administrador com username e senha. Retorna um cookie httpOnly (`aut
 Página que o visitante acessa ao escanear o QR Code na entrada.
 
 Faz fetch para `/api/confirmar?token=<uuid>` e, em caso de sucesso, exibe um QR Code de saída para o visitante guardar.
+
+---
+
+### `GET /api/swagger`
+Retorna a especificacao OpenAPI 3.0 em JSON, gerada automaticamente a partir dos comentarios JSDoc nas rotas.
+
+**Resposta 200:**
+```json
+{ "openapi": "3.0.0", "info": { ... }, "paths": { ... } }
+```
+
+---
+
+## 📖 Swagger UI
+
+Acesse `/api-docs` no navegador para explorar a API interativamente via Swagger UI.
+
+A documentacao e gerada automaticamente pelos comentarios `@swagger` nos arquivos de rota em `src/app/api/`.
 
 ---
 
