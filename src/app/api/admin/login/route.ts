@@ -4,6 +4,60 @@ import { createAdminLoginUseCase } from "@/lib/use-cases/factory";
 import { InvalidCredentialsError } from "@/lib/use-cases/admin-login";
 import { JWT_SECRET, JWT_EXPIRES_IN, COOKIE_NAME } from "@/lib/constants";
 
+/**
+ * @swagger
+ * /api/admin/login:
+ *   post:
+ *     summary: Autentica administrador
+ *     description: Valida credenciais e retorna cookie httpOnly com JWT. O cookie auth_token e usado para autenticar rotas protegidas como GET /api/vagas.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               username:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *             required:
+ *               - username
+ *               - password
+ *     responses:
+ *       200:
+ *         description: Login bem-sucedido. Cookie auth_token setado na resposta.
+ *         headers:
+ *           Set-Cookie:
+ *             schema:
+ *               type: string
+ *               description: Cookie httpOnly auth_token com JWT
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *       400:
+ *         description: Credenciais nao informadas ou corpo invalido.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *       401:
+ *         description: Credenciais invalidas.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ */
 export async function POST(request: NextRequest) {
   let body: { username?: string; password?: string };
 
